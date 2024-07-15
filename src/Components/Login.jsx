@@ -9,7 +9,7 @@ const Login = () => {
 
     const handleLogin = async () => {
         try {
-            const res = await axios.post('http://localhost:8080/login', {
+            const res = await axios.post('https://bulk-email-oh0b.onrender.com/login', {
                 username,
                 password
             });
