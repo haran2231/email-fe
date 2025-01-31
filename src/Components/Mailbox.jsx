@@ -10,6 +10,7 @@ const Mailbox = () => {
     const [fileError, setFileError] = useState("");
     const [fileContent, setFileContent] = useState('');
     const [emailCount, setEmailCount] = useState(0);
+    const [excelData, setExcelData] = useState([]);
     const fileInputRef = useRef(null);
     const navigate = useNavigate();
 
@@ -27,6 +28,7 @@ const Mailbox = () => {
                 const validEmails = emailList.map(item => item.A).filter(email => validateEmail(email));
                 setData(validEmails);
                 setEmailCount(validEmails.length);
+                setExcelData(XLSX.utils.sheet_to_json(sheet));
                 setFileError("");
             } catch (error) {
                 setFileError("Error reading the file. Please ensure it is a valid Excel file.");
@@ -111,6 +113,7 @@ const Mailbox = () => {
                 <input ref={fileInputRef} onChange={handleFile} type="file" accept=".xlsx, .xls" className="p-2 border border-black" />
                 {fileError && <p className="text-red-500">{fileError}</p>}
                 <p>Total Emails: {emailCount}</p>
+                <pre className="text-xs bg-gray-100 text-black p-3 w-full overflow-auto">{JSON.stringify(excelData, null, 2)}</pre>
                 
                 <button onClick={sendEmails} className="px-10 py-3 bg-black text-white rounded-lg shadow-lg" disabled={sending}>
                     {sending ? "Sending..." : "Send Emails"}
