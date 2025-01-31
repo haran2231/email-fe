@@ -1,69 +1,100 @@
+
 import React, { useState, useRef } from "react";
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate hook
+import WordFileUploader from "./WordFileUploader";
 import Mammoth from 'mammoth';
+import FileReader from 'react-file-reader';
+
 
 const Mailbox = () => {
+    // const [msg1, setMsg] = useState("");
     const [sending, setSending] = useState(false);
     const [data, setData] = useState([]);
     const [fileError, setFileError] = useState("");
     const [fileContent, setFileContent] = useState('');
-    const [emailCount, setEmailCount] = useState(0);
-    const [excelData, setExcelData] = useState([]);
+    const [emailcount, setemailcount] = useState(false)
     const fileInputRef = useRef(null);
-    const navigate = useNavigate();
+    const navigation = useNavigate(); // Initialize useNavigate hook
+
+    // const handleMsg = (e) => {
+    //     setMsg(e.target.value);
+    // }
 
     const handleFile = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
         const reader = new FileReader();
+
         reader.onload = (event) => {
             try {
                 const workbook = XLSX.read(event.target.result, { type: 'binary' });
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
                 const emailList = XLSX.utils.sheet_to_json(sheet, { header: 'A' });
-                const validEmails = emailList.map(item => item.A).filter(email => validateEmail(email));
-                setData(validEmails);
-                setEmailCount(validEmails.length);
-                setExcelData(XLSX.utils.sheet_to_json(sheet));
+
+                const totalEmails = emailList.map(item => item.A).filter(email => validateEmail(email));
+                setData(totalEmails);
+                setemailcount(true)
                 setFileError("");
             } catch (error) {
                 setFileError("Error reading the file. Please ensure it is a valid Excel file.");
             }
-        };
-        reader.onerror = () => setFileError("Error reading the file. Please try again.");
+        }
+
+        reader.onerror = () => {
+            setFileError("Error reading the file. Please try again.");
+        }
+
         reader.readAsBinaryString(file);
-    };
+    }
 
-    const handleWordFile = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const arrayBuffer = event.target.result;
-                const result = await Mammoth.extractRawText({ arrayBuffer });
+    const handleFilesforword = async (e) => {
+
+        const files = e.target.files;
+
+        if (!files || files.length === 0) {
+
+            console.error("No file selected.");
+
+            return;
+
+        }
+
+
+
+        const file = files[0];
+
+        const arrayBuffer = await file.arrayBuffer();
+
+
+
+        Mammoth.extractRawText({ arrayBuffer })
+
+            .then((result) => {
+
                 setFileContent(result.value);
-            } catch (error) {
-                setFileError("Error processing the file. Ensure it's a valid .docx file.");
-            }
-        };
-        reader.onerror = () => setFileError("Error reading the file. Please try again.");
-        reader.readAsArrayBuffer(file);
+
+            })
+
+            .catch((error) => {
+                console.error('Error reading Word file:', error);
+
+            });
+
     };
 
     const validateEmail = (email) => {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@(([^<>()\[\]\\.,;:\s@"]+\.)+[^<>()\[\]\\.,;:\s@"]{2,})$/i;
         return re.test(String(email).toLowerCase());
-    };
+    }
 
-    const sendEmails = async () => {
-        if (!fileContent.trim()) {
-            alert("Please enter a message or upload a valid document.");
+    const send = async () => {
+        if (fileContent === "") {
+            alert("Kindly enter a message");
             return;
         }
 
@@ -74,56 +105,74 @@ const Mailbox = () => {
 
         setSending(true);
         try {
-            const response = await axios.post("https://email-app-9dmm.onrender.com/sendemail", {
-                msg: fileContent,
-                email: data,
-            });
+            const response = await axios.post("https://email-app-9dmm.onrender.com/sendemail", { msg: fileContent, email: data, });
+            console.log(response.data);
             if (response.data) {
-                alert("Emails sent successfully!");
+                alert("Email sent successfully");
                 setFileContent("");
-                setEmailCount(0);
-                setData([]);
             } else {
-                alert("Failed to send emails.");
+                alert("Failed to send");
             }
         } catch (error) {
-            alert("Error sending emails. Please try again later.");
+            alert("Failed to send. Please try again later.");
         } finally {
             setSending(false);
-            if (fileInputRef.current) fileInputRef.current.value = ''; 
+            setemailcount(false)
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';  // Resets the file input to empty
+              }
         }
-    };
+    }
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        navigate('/');
+        localStorage.removeItem('token'); // Remove token from localStorage
+        navigation('/'); // Redirect to the login page after logout
     };
 
     return (
-        <div className="bg-black text-white min-h-screen flex flex-col items-center py-5">
-            <h1 className="text-3xl font-bold">Bulk Email Send Application</h1>
-            <h2 className="text-2xl font-medium bg-blue-700 w-full text-center py-3">Send multiple emails with ease</h2>
-            
-            <div className="bg-blue-200 p-5 w-3/4 flex flex-col items-center gap-4 rounded-lg shadow-md">
-                <h2 className="text-xl font-medium">Upload Word File or Type Your Message</h2>
-                <input ref={fileInputRef} onChange={handleWordFile} type="file" accept=".docx" className="p-2 border border-black" />
-                <textarea value={fileContent} onChange={(e) => setFileContent(e.target.value)} className="w-full h-40 p-3 border border-gray-500 rounded" />
-                
-                <h2 className="text-xl font-medium">Upload Excel File with Emails</h2>
-                <input ref={fileInputRef} onChange={handleFile} type="file" accept=".xlsx, .xls" className="p-2 border border-black" />
-                {fileError && <p className="text-red-500">{fileError}</p>}
-                <p>Total Emails: {emailCount}</p>
-                <pre className="text-xs bg-gray-100 text-black p-3 w-full overflow-auto">{JSON.stringify(excelData, null, 2)}</pre>
-                
-                <button onClick={sendEmails} className="px-10 py-3 bg-black text-white rounded-lg shadow-lg" disabled={sending}>
-                    {sending ? "Sending..." : "Send Emails"}
-                </button>
-                <button onClick={handleLogout} className="px-10 py-3 bg-red-500 text-white rounded-lg shadow-lg">Logout</button>
+        <div className="bg-black">
+            <div className="py-5 text-3xl font-bold text-center text-white bg-black">
+                <h1>Bulk Email Send Application</h1>
             </div>
 
-            <footer className="mt-10 text-xs">© 2024 Bulk Email Sender</footer>
+            <div className="py-5 text-2xl font-medium text-center text-white bg-blue-700">
+                <h1>You can send multiple emails using this application</h1>
+            </div>
+
+            <div className="py-5 text-xl font-medium text-center text-white bg-blue-500">
+                <h1>Drag and Drop</h1>
+            </div>
+
+            <div className="flex flex-col items-center gap-5 py-5 text-xl font-medium text-center text-black bg-blue-200">
+                <h2>Upload Word File or you can type</h2>
+                {/* <FileReader handleFiles={handleFilesforword} fileTypes={['.docx']}> */}
+                {/* <button className="p-2 my-4 border border-black border-solid">Select Word File</button> */}
+                <input className="p-2 border border-black border-solid" ref={fileInputRef} onChange={handleFilesforword} type="file" />
+                {/* </FileReader> */}
+                <textarea
+                    value={fileContent}
+                    className="w-[80%] h-60 px-3"
+                    onChange={(e) => setFileContent(e.target.value)}
+                    rows="20"
+                    cols="80"
+                />
+                {/* <textarea onChange={handleMsg} value={msg} className="w-[80%] h-60 px-3"></textarea> */}
+                <input className="p-2 border border-black border-solid" ref={fileInputRef} onChange={handleFile} type="file" />
+                {fileError && <p className="text-red-500">{fileError}</p>}
+                <p>Total Emails:{emailcount ? data.length:"0" } </p>
+                <button onClick={send} className="px-10 py-3 text-xl font-normal text-white bg-black" type="button" disabled={sending}>
+                    {sending ? "Sending..." : "Send"}
+                </button>
+                <button onClick={handleLogout} className="px-10 py-3 text-xl font-normal text-white bg-red-500" type="button">
+                    Logout
+                </button>
+            </div>
+
+            <div className="py-5 text-xs font-medium text-center text-white bg-black">
+                <h1>Copyrights @abc</h1>
+            </div>
         </div>
-    );
-};
+    )
+}
 
 export default Mailbox;
